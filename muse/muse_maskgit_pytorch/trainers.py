@@ -121,6 +121,7 @@ class VQGanVAETrainer(nn.Module):
         vae: VQGanVAE,
         *,
         folder,
+        dataset,
         num_train_steps,
         batch_size,
         image_size,
@@ -186,7 +187,9 @@ class VQGanVAETrainer(nn.Module):
 
         # create dataset
 
-        self.ds = ImageDataset(folder, image_size)
+        # self.ds = ImageDataset(folder, image_size)
+        # changed
+        self.ds = dataset
 
         # split for validation
 

@@ -1,0 +1,15 @@
+accelerate
+beartype
+einops>=0.6
+ema-pytorch>=0.2.2
+pillow
+sentencepiece
+torch>=1.6
+transformers
+torch>=1.6
+torchvision
+tqdm
+vector-quantize-pytorch>=0.10.14
+datasets
+torchvision
+matplotlib

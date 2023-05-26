@@ -1,71 +1,85 @@
-
-from muse_maskgit_pytorch import utils_data
-args = utils_data.get_args
-dataset = utils_data.get_dataset(args, is_train=True, is_only_image=True)
-
+import os
 import torch
 import torch.nn.functional as F
 from muse_maskgit_pytorch import VQGanVAE, VQGanVAETrainer
 from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
 
-def init_vae():
+vq_codebook_size = 4
+dim_vae = 16
+layer = 2
+seq_len = 16
+image_size = 16
+
+dim_transformer = 32
+dim_depth = 4
+dim_dim_head = 4
+dim_heads = 4
+
+def init_vae(args):
     vae = VQGanVAE(
-        dim = 256,
-        vq_codebook_size = 512
+        dim = dim_vae,
+        vq_codebook_size = vq_codebook_size,
+        layer = layer
     )
+    if os.path.exists(args.path_save_vae):
+        vae.load(args.path_save_vae)
     return vae
 
-def init_base_transformer():
+def init_transformer(is_base=False):
     transformer = MaskGitTransformer(
-        num_tokens = 512,         # must be same as codebook size above
-        seq_len = 256,            # must be equivalent to fmap_size ** 2 in vae
-        dim = 512,                # model dimension
-        depth = 8,                # depth
-        dim_head = 64,            # attention head dimension
-        heads = 8,                # attention heads,
+        num_tokens = vq_codebook_size,         # must be same as codebook size above
+        seq_len = seq_len if is_base else seq_len*4,            # must be equivalent to fmap_size ** 2 in vae
+        dim = dim_transformer,                # model dimension
+        depth = dim_depth,                # depth
+        dim_head = dim_dim_head,            # attention head dimension
+        heads = dim_heads,                # attention heads,
         ff_mult = 4,              # feedforward expansion factor
         t5_name = 't5-small',     # name of your T5
     )
     return transformer
 
-def init_superres_transformer():
-    transformer = MaskGitTransformer(
-        num_tokens = 512,         # must be same as codebook size above
-        seq_len = 1024,           # must be equivalent to fmap_size ** 2 in vae
-        dim = 512,                # model dimension
-        depth = 2,                # depth
-        dim_head = 64,            # attention head dimension
-        heads = 8,                # attention heads,
-        ff_mult = 4,              # feedforward expansion factor
-        t5_name = 't5-small',     # name of your T5
-    )
-    return transformer
+# def init_superres_transformer():
+#     transformer = MaskGitTransformer(
+#         num_tokens = vq_codebook_size,         # must be same as codebook size above
+#         seq_len = seq_len*4,           # must be equivalent to fmap_size ** 2 in vae
+#         dim = 512,                # model dimension
+#         depth = 2,                # depth
+#         dim_head = 64,            # attention head dimension
+#         heads = 8,                # attention heads,
+#         ff_mult = 4,              # feedforward expansion factor
+#         t5_name = 't5-small',     # name of your T5
+#     )
+#     return transformer
 
-def init_base(vae, transformer):
+def init_base(args, vae, transformer):
     base_maskgit = MaskGit(
         vae = vae,                 # vqgan vae
         transformer = transformer, # transformer
-        image_size = 256,          # image size
+        image_size = image_size,          # image size
         cond_drop_prob = 0.25,     # conditional dropout, for classifier free guidance
     )
+    if os.path.exists(args.path_save_base):
+        base_maskgit.load(args.path_save_base)
     return base_maskgit
 
-def init_superres(vae, transformer):
+def init_superres(args, vae, transformer):
     superres_maskgit = MaskGit(
         vae = vae,
         transformer = transformer,
         cond_drop_prob = 0.25,
-        image_size = 512,                     # larger image size
-        cond_image_size = 256,                # conditioning image size <- this must be set
+        image_size = image_size*2,                     # larger image size
+        cond_image_size = image_size,                # conditioning image size <- this must be set
     )
+    if os.path.exists(args.path_save_superres):
+        superres_maskgit.load(args.path_save_superres)
     return superres_maskgit
 
-def train_vae():
-    vae = init_vae()
+def train_vae(args, dataset):
+    vae = init_vae(args)
 
     trainer = VQGanVAETrainer(
         vae = vae,
-        image_size = args.image_size,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
+        image_size = image_size,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
         folder = '**deprecated**',
         dataset=dataset,
         batch_size = args.batch_size_vae,
@@ -75,22 +89,20 @@ def train_vae():
     trainer.train()
     vae.save(args.path_save_vae)
 
-def train_base():
+def train_base(args):
     # first instantiate your vae
 
-    vae = init_vae()
-
-    vae.load(args.path_save_vae) # you will want to load the exponentially moving averaged VAE
+    vae = init_vae(args)
 
     # then you plug the vae and transformer into your MaskGit as so
 
     # (1) create your transformer / attention network
 
-    transformer = init_base_transformer()
+    transformer = init_transformer(is_base=True)
 
     # (2) pass your trained VAE and the base transformer to MaskGit
 
-    base_maskgit = init_base(vae, transformer)
+    base_maskgit = init_base(args, vae, transformer)
 
     # ready your training text and images
 
@@ -101,7 +113,7 @@ def train_base():
         'seashells sparkling in the shallow waters'
     ]
 
-    images = torch.randn(4, 3, 256, 256).cuda()
+    images = torch.randn(4, 3, image_size, image_size).cuda()
 
     # feed it into your maskgit instance, with return_loss set to True
 
@@ -125,23 +137,21 @@ def train_base():
     
     base_maskgit.save(args.path_save_base)
 
-def train_superres():
+def train_superres(args):
     # first instantiate your ViT VQGan VAE
     # a VQGan VAE made of transformers
 
-    vae = init_vae()
-
-    vae.load(args.path_save_vae) # you will want to load the exponentially moving averaged VAE
+    vae = init_vae(args)
 
     # then you plug the VqGan VAE into your MaskGit as so
 
     # (1) create your transformer / attention network
 
-    transformer = init_superres_transformer()
+    transformer = init_transformer(is_base=False)
 
     # (2) pass your trained VAE and the base transformer to MaskGit
 
-    superres_maskgit = init_superres(vae, transformer)
+    superres_maskgit = init_superres(args, vae, transformer)
 
     # ready your training text and images
 
@@ -152,7 +162,7 @@ def train_superres():
         'seashells sparkling in the shallow waters'
     ]
 
-    images = torch.randn(4, 3, 512, 512).cuda()
+    images = torch.randn(4, 3, image_size*2, image_size*2).cuda()
 
     # feed it into your maskgit instance, with return_loss set to True
 
@@ -173,27 +183,24 @@ def train_superres():
             'fireworks with blue and green sparkles',
             'waking up to a psychedelic landscape'
         ],
-        cond_images = F.interpolate(images, 256),  # conditioning images must be passed in for generating from superres
+        cond_images = F.interpolate(images, image_size),  # conditioning images must be passed in for generating from superres
         cond_scale = 3.
     )
 
     images.shape # (4, 3, 512, 512)
     superres_maskgit.save(args.path_save_superres)
 
-def inference():
+def inference(args):
     from muse_maskgit_pytorch import Muse
 
-    vae = init_vae()
-    vae.load(args.path_save_vae) # you will want to load the exponentially moving averaged VAE
+    vae = init_vae(args)
 
-    transformer = init_base_transformer()
-    base_maskgit = init_base(vae, transformer)
+    transformer = init_transformer(is_base=True)
+    base_maskgit = init_base(args, vae, transformer)
 
-    transformer = init_superres_transformer()
-    superres_maskgit = init_superres(vae, transformer)
+    transformer = init_transformer(is_base=False)
+    superres_maskgit = init_superres(args, vae, transformer)
 
-    base_maskgit.load(args.path_save_base)
-    superres_maskgit.load(args.path_save_superres)
     # pass in the trained base_maskgit and superres_maskgit from above
 
     muse = Muse(

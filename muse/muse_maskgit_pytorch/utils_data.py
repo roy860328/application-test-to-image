@@ -31,6 +31,8 @@ class ImageDescDataset(Dataset):
         """
         self.dataset = load_dataset(dataset_name)
         self.dataset = self.dataset["train"] if is_train else self.dataset["test"]
+        self.dataset_image = self.dataset["image"]
+        self.dataset_description = self.dataset["description"]
         self.n = len(self.dataset)
         self.transform = transforms.Compose([transforms.Resize((image_size, image_size)),
                                              transforms.ToTensor()])
@@ -40,9 +42,9 @@ class ImageDescDataset(Dataset):
         return self.n
 
     def __getitem__(self, idx):
-        image = self.dataset["image"][idx]
+        image = self.dataset_image[idx]
         image = self.transform(image)
-        description = self.dataset["description"][idx]
+        description = self.dataset_description[idx]
         if self.is_only_image:
             return image
         else:
@@ -83,7 +85,7 @@ def test():
     train_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=batch_size, 
                                                shuffle=True,
-                                               num_workers=1)
+                                               num_workers=2)
 
     for idx, (img, description) in enumerate(train_loader):
         # just check dataset is working

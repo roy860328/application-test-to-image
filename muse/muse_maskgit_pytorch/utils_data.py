@@ -57,7 +57,9 @@ class ImageDescDataset(Dataset):
     def _random_choie(self, description):
         # random choice one sentence
         description = [sentence for sentence in description.split("\n") if sentence != ""]
-        description = description[np.random.choice(len(description))]
+        # overfitting
+        # description = description[np.random.choice(len(description))]
+        description = description[0]
         return description
 
 def get_args():
@@ -66,7 +68,7 @@ def get_args():
     parser.add_argument('--image_size', type=int, default=128)
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--num_epochs', type=int, default=1)
-    parser.add_argument('--num_train_steps_vae', type=int, default=100)
+    parser.add_argument('--num_train_steps_vae', type=int, default=10000)
     parser.add_argument('--path_save_vae', type=str, default="./model/model_vae.pth")
     parser.add_argument('--path_save_base', type=str, default="./model/model_base.pth")
     parser.add_argument('--path_save_superres', type=str, default="./model/model_superres.pth")
@@ -98,7 +100,7 @@ def test():
 
     train_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=batch_size, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                num_workers=0)
 

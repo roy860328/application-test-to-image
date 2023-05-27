@@ -8,7 +8,7 @@ from muse_maskgit_pytorch import utils_data
 # set
 vq_codebook_size = 512
 dim_vae = 256
-layer = 2
+layer = 4
 
 seq_len = 256
 dim_transformer = 512
@@ -185,8 +185,10 @@ def inference(args):
     from matplotlib import pyplot as plt
     for image, description in zip(images, descriptions):
         print(description)
-        plt.imshow(image.permute(1, 2, 0))
+        # image is a PILImage
+        plt.imshow(image)
         plt.show()
+
 
 if __name__ == '__main__':
     from muse_maskgit_pytorch import utils_data

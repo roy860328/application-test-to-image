@@ -203,11 +203,12 @@ class VQGanVAETrainer(nn.Module):
             self.print(f'training with shared training and valid dataset of {len(self.ds)} samples')
 
         # dataloader
-
         self.dl = DataLoader(
             self.ds,
             batch_size = batch_size,
-            shuffle = True
+            # overfitting
+            # shuffle = True
+            shuffle = False
         )
 
         self.valid_dl = DataLoader(

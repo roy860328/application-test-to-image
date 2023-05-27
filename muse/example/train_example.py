@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from muse_maskgit_pytorch import VQGanVAE, VQGanVAETrainer
 from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
 
-# set
 vq_codebook_size = 512
 dim_vae = 256
 layer = 2
@@ -61,14 +60,9 @@ def init_superres(args, vae, transformer):
         superres_maskgit.load(args.path_save_superres)
     return superres_maskgit
 
-def train_vae(args):
+def train_vae(args, dataset):
     vae = init_vae(args)
 
-    dataset = utils_data.get_dataset(args, 
-                                     image_size=args.image_size, 
-                                     is_train=True, 
-                                     is_only_image=True)
-    
     trainer = VQGanVAETrainer(
         vae = vae,
         image_size = args.image_size,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
@@ -79,66 +73,84 @@ def train_vae(args):
         num_train_steps = args.num_train_steps_vae
     )
     trainer.train()
-    if not os.path.exists(args.path_save_vae):
-        os.makedirs(args.path_save_vae)
     vae.save(args.path_save_vae)
 
-def train_base(args, dataset):
+def train_base(args):
+    # first instantiate your vae
+
     vae = init_vae(args)
+
+    # then you plug the vae and transformer into your MaskGit as so
+
+    # (1) create your transformer / attention network
+
     transformer = init_transformer(is_base=True)
+
+    # (2) pass your trained VAE and the base transformer to MaskGit
+
     base_maskgit = init_base(args, vae, transformer)
 
-    dataset = utils_data.get_dataset(args, 
-                                     image_size=args.image_size, 
-                                     is_train=True, 
-                                     is_only_image=False)
-    train_loader = torch.utils.data.DataLoader(dataset, 
-                                               batch_size=args.batch_size, 
-                                               shuffle=True,
-                                               drop_last=True,
-                                               num_workers=0)
-    for epoch in range(args.num_epochs):
-        for i, (images, texts) in enumerate(train_loader):
-            loss = base_maskgit(images, 
-                                texts=texts)
-            loss.backward()
-            base_maskgit.step()
-            base_maskgit.zero_grad()
-            if base_maskgit.step() % 100 == 0:
-                print('step: %d, loss: %.5f' % (base_maskgit.step(), loss.item()))
+    # ready your training text and images
 
+    texts = [
+        'a child screaming at finding a worm within a half-eaten apple',
+        'lizard running across the desert on two feet',
+        'waking up to a psychedelic landscape',
+        'seashells sparkling in the shallow waters'
+    ]
+
+    images = torch.randn(4, 3, args.image_size, args.image_size).cuda()
+
+    # feed it into your maskgit instance, with return_loss set to True
+
+    loss = base_maskgit(
+        images,
+        texts = texts
+    )
+
+    loss.backward()
+
+    # do this for a long time on much data
+    # then...
+
+    images = base_maskgit.generate(texts = [
+        'a whale breaching from afar',
+        'young girl blowing out candles on her birthday cake',
+        'fireworks with blue and green sparkles'
+    ], cond_scale = 3.) # conditioning scale for classifier free guidance
+
+    images.shape # (3, 3, 256, 256)
+    
     base_maskgit.save(args.path_save_base)
 
 def train_superres(args):
+    # first instantiate your ViT VQGan VAE
+    # a VQGan VAE made of transformers
+
     vae = init_vae(args)
+
+    # then you plug the VqGan VAE into your MaskGit as so
+
+    # (1) create your transformer / attention network
+
     transformer = init_transformer(is_base=False)
+
+    # (2) pass your trained VAE and the base transformer to MaskGit
+
     superres_maskgit = init_superres(args, vae, transformer)
 
+    # ready your training text and images
 
-    dataset = utils_data.get_dataset(args, 
-                                     image_size=args.image_size*2, 
-                                     is_train=True, 
-                                     is_only_image=False)
-
-    # similiar with train_base
-    train_loader = torch.utils.data.DataLoader(dataset, 
-                                               batch_size=args.batch_size, 
-                                               shuffle=True,
-                                               drop_last=True,
-                                               num_workers=0)
-    for epoch in range(args.num_epochs):
-        for i, (images, texts) in enumerate(train_loader):
-            loss = superres_maskgit(images, 
-                                    texts=texts)
-            loss.backward()
-            superres_maskgit.step()
-            superres_maskgit.zero_grad()
-            if superres_maskgit.step() % 100 == 0:
-                print('step: %d, loss: %.5f' % (superres_maskgit.step(), loss.item()))
-
+    texts = [
+        'a child screaming at finding a worm within a half-eaten apple',
+        'lizard running across the desert on two feet',
+        'waking up to a psychedelic landscape',
+        'seashells sparkling in the shallow waters'
+    ]
 
     images = torch.randn(4, 3, args.image_size*2, args.image_size*2).cuda()
 
+    # feed it into your maskgit instance, with return_loss set to True
 
     loss = superres_maskgit(
         images,
@@ -166,11 +178,16 @@ def train_superres(args):
 
 def inference(args):
     from muse_maskgit_pytorch import Muse
+
     vae = init_vae(args)
+
     transformer = init_transformer(is_base=True)
     base_maskgit = init_base(args, vae, transformer)
+
     transformer = init_transformer(is_base=False)
     superres_maskgit = init_superres(args, vae, transformer)
+
+    # pass in the trained base_maskgit and superres_maskgit from above
 
     muse = Muse(
         base = base_maskgit,
@@ -187,10 +204,7 @@ def inference(args):
     images # List[PIL.Image.Image]
 
 if __name__ == '__main__':
-    from muse_maskgit_pytorch import utils_data
-    args = utils_data.get_args()    
-    train_vae(args)
-    train_base(args)
-    train_superres(args)
-
+    train_vae()
+    train_base()
+    train_superres()
     inference()

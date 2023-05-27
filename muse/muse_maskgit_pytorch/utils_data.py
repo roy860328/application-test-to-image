@@ -14,6 +14,7 @@ class ImageDescDataset(Dataset):
     def __init__(self, 
                  dataset_name, 
                  image_size, 
+                 use_min_data=False,
                  is_train=True,
                  is_only_image=False):
         """
@@ -33,7 +34,7 @@ class ImageDescDataset(Dataset):
         self.dataset = self.dataset["train"] if is_train else self.dataset["test"]
         self.dataset_image = self.dataset["image"]
         self.dataset_description = self.dataset["description"]
-        self.n = len(self.dataset)
+        self.n = len(self.dataset) if not use_min_data else 4
         self.transform = transforms.Compose([transforms.Resize((image_size, image_size)),
                                              transforms.ToTensor()])
         self.is_only_image = is_only_image
@@ -54,20 +55,24 @@ def get_args():
     parser = argparse.ArgumentParser(description='Dataset script')
     parser.add_argument('--dataset', type=str, default="CUB-200")
     parser.add_argument('--image_size', type=int, default=128)
-    parser.add_argument('--batch_size_vae', type=int, default=2)
+    parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--num_epochs', type=int, default=1)
     parser.add_argument('--num_train_steps_vae', type=int, default=10)
-    parser.add_argument('--path_save_vae', type=str, default="./mode/vae.pt")
-    parser.add_argument('--path_save_base', type=str, default="./mode/base.pt")
-    parser.add_argument('--path_save_superres', type=str, default="./mode/superres.pt")
+    parser.add_argument('--path_save_vae', type=str, default="./model/vae.pt")
+    parser.add_argument('--path_save_base', type=str, default="./model/base.pt")
+    parser.add_argument('--path_save_superres', type=str, default="./model/superres.pt")
+    parser.add_argument('--use_min_data', type=bool, default=True)
+
     args, unknown = parser.parse_known_args()
     return args
 
 # dataset
-def get_dataset(args, is_train, is_only_image):
+def get_dataset(args, image_size, is_train, is_only_image):
     if args.dataset == "CUB-200":
         dataset_CUB = "alkzar90/CC6204-Hackaton-Cub-Dataset"
         dataset = ImageDescDataset(dataset_name=dataset_CUB,
-                                   image_size=args.image_size,
+                                   image_size=image_size,
+                                   use_min_data=args.use_min_data,
                                    is_train=is_train,
                                    is_only_image=is_only_image)
     else:
@@ -78,14 +83,15 @@ def get_dataset(args, is_train, is_only_image):
 # just for check utils_data.py is working
 def test():
     args = get_args()
-    dataset = get_dataset(args, is_train=True, is_only_image=False)
+    dataset = get_dataset(args, image_size=args.image_size, is_train=True, is_only_image=False)
     # hyper parameter
     batch_size = 2
 
     train_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=batch_size, 
                                                shuffle=True,
-                                               num_workers=2)
+                                               drop_last=True,
+                                               num_workers=0)
 
     for idx, (img, description) in enumerate(train_loader):
         # just check dataset is working

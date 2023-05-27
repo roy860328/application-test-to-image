@@ -5,6 +5,7 @@ pip install datasets
 import os
 import argparse
 from datasets import load_dataset
+import numpy as np
 
 import torch
 from torch.utils.data import Dataset
@@ -34,9 +35,10 @@ class ImageDescDataset(Dataset):
         self.dataset = self.dataset["train"] if is_train else self.dataset["test"]
         self.dataset_image = self.dataset["image"]
         self.dataset_description = self.dataset["description"]
-        self.n = len(self.dataset) if not use_min_data else 4
+        self.n = len(self.dataset) if not use_min_data else 100
         self.transform = transforms.Compose([transforms.Resize((image_size, image_size)),
-                                             transforms.ToTensor()])
+                                             transforms.ToTensor(),
+                                             transforms.Lambda(lambda img: img.repeat(3, 1, 1) if img.shape[0] == 1 else img)])
         self.is_only_image = is_only_image
 
     def __len__(self):
@@ -46,10 +48,17 @@ class ImageDescDataset(Dataset):
         image = self.dataset_image[idx]
         image = self.transform(image)
         description = self.dataset_description[idx]
+        description = self._random_choie(description)
         if self.is_only_image:
             return image
         else:
             return image, description
+
+    def _random_choie(self, description):
+        # random choice one sentence
+        description = [sentence for sentence in description.split("\n") if sentence != ""]
+        description = description[np.random.choice(len(description))]
+        return description
 
 def get_args():
     parser = argparse.ArgumentParser(description='Dataset script')
@@ -57,10 +66,10 @@ def get_args():
     parser.add_argument('--image_size', type=int, default=128)
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--num_epochs', type=int, default=1)
-    parser.add_argument('--num_train_steps_vae', type=int, default=10)
-    parser.add_argument('--path_save_vae', type=str, default="./model/vae.pt")
-    parser.add_argument('--path_save_base', type=str, default="./model/base.pt")
-    parser.add_argument('--path_save_superres', type=str, default="./model/superres.pt")
+    parser.add_argument('--num_train_steps_vae', type=int, default=100)
+    parser.add_argument('--path_save_vae', type=str, default="./model/model_vae.pth")
+    parser.add_argument('--path_save_base', type=str, default="./model/model_base.pth")
+    parser.add_argument('--path_save_superres', type=str, default="./model/model_superres.pth")
     parser.add_argument('--use_min_data', type=bool, default=True)
 
     args, unknown = parser.parse_known_args()

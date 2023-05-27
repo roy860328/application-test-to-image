@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from muse_maskgit_pytorch import VQGanVAE, VQGanVAETrainer
 from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
+from muse_maskgit_pytorch import utils_data
 
 # set
 vq_codebook_size = 512
@@ -21,7 +22,10 @@ def init_vae(args):
         vq_codebook_size = vq_codebook_size,
         layer = layer
     )
+    if torch.cuda.is_available(): 
+        vae = vae.cuda()
     if os.path.exists(args.path_save_vae):
+        print(f"load vae model from {args.path_save_vae}")
         vae.load(args.path_save_vae)
     return vae
 
@@ -45,7 +49,10 @@ def init_base(args, vae, transformer):
         image_size = args.image_size,          # image size
         cond_drop_prob = 0.25,     # conditional dropout, for classifier free guidance
     )
+    if torch.cuda.is_available():
+        base_maskgit = base_maskgit.cuda()
     if os.path.exists(args.path_save_base):
+        print(f"load base model from {args.path_save_base}")
         base_maskgit.load(args.path_save_base)
     return base_maskgit
 
@@ -57,7 +64,10 @@ def init_superres(args, vae, transformer):
         image_size = args.image_size*2,                     # larger image size
         cond_image_size = args.image_size,                # conditioning image size <- this must be set
     )
+    if torch.cuda.is_available():
+        superres_maskgit = superres_maskgit.cuda()
     if os.path.exists(args.path_save_superres):
+        print(f"load superres model from {args.path_save_superres}")
         superres_maskgit.load(args.path_save_superres)
     return superres_maskgit
 
@@ -78,12 +88,14 @@ def train_vae(args):
         grad_accum_every = 8,
         num_train_steps = args.num_train_steps_vae
     )
+    if torch.cuda.is_available(): trainer = trainer.cuda()
     trainer.train()
-    if not os.path.exists(args.path_save_vae):
-        os.makedirs(args.path_save_vae)
+
+    if not os.path.exists(os.path.dirname(args.path_save_vae)):
+        os.makedirs(os.path.dirname(args.path_save_vae))
     vae.save(args.path_save_vae)
 
-def train_base(args, dataset):
+def train_base(args):
     vae = init_vae(args)
     transformer = init_transformer(is_base=True)
     base_maskgit = init_base(args, vae, transformer)
@@ -94,19 +106,23 @@ def train_base(args, dataset):
                                      is_only_image=False)
     train_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=args.batch_size, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                num_workers=0)
     for epoch in range(args.num_epochs):
         for i, (images, texts) in enumerate(train_loader):
+            if torch.cuda.is_available(): 
+                images = images.cuda()
+            texts = list(texts)
             loss = base_maskgit(images, 
                                 texts=texts)
             loss.backward()
-            base_maskgit.step()
             base_maskgit.zero_grad()
-            if base_maskgit.step() % 100 == 0:
-                print('step: %d, loss: %.5f' % (base_maskgit.step(), loss.item()))
+            if i % 100 == 0 or args.use_min_data:
+                print('step: %d, loss: %.5f' % (i, loss.item()))
 
+    if not os.path.exists(os.path.dirname(args.path_save_base)):
+        os.makedirs(os.path.dirname(args.path_save_base))
     base_maskgit.save(args.path_save_base)
 
 def train_superres(args):
@@ -123,19 +139,23 @@ def train_superres(args):
     # similiar with train_base
     train_loader = torch.utils.data.DataLoader(dataset, 
                                                batch_size=args.batch_size, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                num_workers=0)
     for epoch in range(args.num_epochs):
         for i, (images, texts) in enumerate(train_loader):
+            if torch.cuda.is_available():
+                images = images.cuda()
+            texts = list(texts)
             loss = superres_maskgit(images, 
                                     texts=texts)
             loss.backward()
-            superres_maskgit.step()
             superres_maskgit.zero_grad()
-            if superres_maskgit.step() % 100 == 0:
-                print('step: %d, loss: %.5f' % (superres_maskgit.step(), loss.item()))
+            if i % 100 == 0 or args.use_min_data:
+                print('step: %d, loss: %.5f' % (i, loss.item()))
 
+    if not os.path.exists(os.path.dirname(args.path_save_superres)):
+        os.makedirs(os.path.dirname(args.path_save_superres))
     superres_maskgit.save(args.path_save_superres)
 
 def inference(args):
@@ -151,14 +171,22 @@ def inference(args):
         superres = superres_maskgit
     )
 
-    images = muse([
-        'a whale breaching from afar',
-        'young girl blowing out candles on her birthday cake',
-        'fireworks with blue and green sparkles',
-        'waking up to a psychedelic landscape'
-    ])
+    if torch.cuda.is_available():
+        muse = muse.cuda()
 
-    images # List[PIL.Image.Image]
+    descriptions = [
+        'this bird has a black head, a white superciliary, a brown wing, and a black outer rectrices.',
+        'this bird has bright yellow feathers and a black beak.',
+        'this bird is brown with white and has a very short beak.',
+        'this small bird is of variant shades of gray, and its beak is short and pointed.'
+    ]
+    images = muse(descriptions)
+
+    from matplotlib import pyplot as plt
+    for image, description in zip(images, descriptions):
+        print(description)
+        plt.imshow(image.permute(1, 2, 0))
+        plt.show()
 
 if __name__ == '__main__':
     from muse_maskgit_pytorch import utils_data

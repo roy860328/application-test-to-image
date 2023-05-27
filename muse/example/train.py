@@ -136,32 +136,6 @@ def train_superres(args):
             if superres_maskgit.step() % 100 == 0:
                 print('step: %d, loss: %.5f' % (superres_maskgit.step(), loss.item()))
 
-
-    images = torch.randn(4, 3, args.image_size*2, args.image_size*2).cuda()
-
-
-    loss = superres_maskgit(
-        images,
-        texts = texts
-    )
-
-    loss.backward()
-
-    # do this for a long time on much data
-    # then...
-
-    images = superres_maskgit.generate(
-        texts = [
-            'a whale breaching from afar',
-            'young girl blowing out candles on her birthday cake',
-            'fireworks with blue and green sparkles',
-            'waking up to a psychedelic landscape'
-        ],
-        cond_images = F.interpolate(images, args.image_size),  # conditioning images must be passed in for generating from superres
-        cond_scale = 3.
-    )
-
-    images.shape # (4, 3, 512, 512)
     superres_maskgit.save(args.path_save_superres)
 
 def inference(args):

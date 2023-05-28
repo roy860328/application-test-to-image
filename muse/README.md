@@ -1,6 +1,6 @@
 ## Muse - Pytorch
 Origin Repository
-```
+```bash
 https://github.com/lucidrains/muse-maskgit-pytorch
 ```
 <img src="./muse.png" width="450px"></img>
@@ -13,7 +13,7 @@ Please reference the pipeline at `muse/example.ipynb` for detailed implementatio
 
 ### Installation
 To run the code, please ensure you have the following requirements installed:
-```
+```python
 !pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 !git clone https://github.com/roy860328/application-test-to-image.git
 !cd application-test-to-image/muse; pip3 install -r requirements.txt
@@ -33,7 +33,7 @@ https://huggingface.co/datasets/alkzar90/CC6204-Hackaton-Cub-Dataset
 
 Follow the steps below to run the training:
 
-```
+```python
 from muse_maskgit_pytorch import utils_data
 from example import train
 
@@ -65,20 +65,20 @@ For model evaluation, I have used the CLIP score. CLIP Score refers to the cosin
 
 The following command is for the original dataset of image-text pairs:
 
-```
+```python
 import evaluation_data
 evaluation_data.save_origin_dataset()
 ```
 
 Run the CLIP score evaluation on the original dataset:
 
-```
+```python
 python3 src/clip_score/clip_score.py ./dataset_image_origin ./dataset_text_origin
 ```
 
 The following command loads a pre-trained model to generate an image from text:
 
-```
+```python
 import evaluation_data
 import utils_model
 gt_texts = ['this bird is brown with a lighter brown crest.']
@@ -91,7 +91,7 @@ evaluation_data.save_image_text(images,
 
 Run the CLIP score evaluation on the result:
 
-```
+```python
 python3 src/clip_score/clip_score.py ./dataset_image_test ./dataset_text_test
 ```
 

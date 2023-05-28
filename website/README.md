@@ -17,7 +17,7 @@ This repository contains a Flask-based website that generates images from text u
 
 1. Start the Flask server by running the following command:
 
-```
+```bash
 python main.py --path_save_vae {path_model_vae.pt} --path_save_base {path_model_base.pt}
 ```
 
@@ -25,7 +25,6 @@ python main.py --path_save_vae {path_model_vae.pt} --path_save_base {path_model_
 3. Enter a text input and click the "Generate Image" button.
 4. The app will generate an image corresponding to the text input, and display it on the webpage.
 
----
 
 ### API Endpoints
 

@@ -45,7 +45,7 @@ train.inference(args)
 ```
 
 ### Sample Input/Output
-VQGanVAE
+VQGanVAE reconstruction result:
 <img src="./result/result_VQGanVAE.png" width="450px"></img>
 
 MaskGit Input:

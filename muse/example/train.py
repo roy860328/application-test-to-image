@@ -5,6 +5,9 @@ from muse_maskgit_pytorch import VQGanVAE, VQGanVAETrainer
 from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
 from muse_maskgit_pytorch import utils_data
 
+from matplotlib import pyplot as plt
+import torchvision.transforms as T
+
 # set
 vq_codebook_size = 512
 dim_vae = 256
@@ -75,13 +78,13 @@ def train_vae(args):
     vae = init_vae(args)
 
     dataset = utils_data.get_dataset(args, 
-                                     image_size=args.image_size, 
+                                     image_size=128, #args.image_size/2, 
                                      is_train=True, 
                                      is_only_image=True)
     
     trainer = VQGanVAETrainer(
         vae = vae,
-        image_size = args.image_size,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
+        image_size = 128, #args.image_size/2,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
         folder = '**deprecated**',
         dataset=dataset,
         batch_size = args.batch_size,
@@ -90,6 +93,26 @@ def train_vae(args):
     )
     if torch.cuda.is_available(): trainer = trainer.cuda()
     trainer.train()
+
+    train_loader = torch.utils.data.DataLoader(dataset, 
+                                               batch_size=args.batch_size, 
+                                               shuffle=False,
+                                               drop_last=True,
+                                               num_workers=0)
+    # overfitting
+    for _ in range(20):
+        trainer.vae.train()
+        trainer.train()
+        trainer.steps = 1
+        trainer.vae.eval()
+        for i, img in enumerate(train_loader):
+            if torch.cuda.is_available(): 
+                img = img.cuda()
+            fmap, indices, commit_loss = vae.encode(img)
+            fmap = vae.decode(fmap)
+            for image in list(map(T.ToPILImage(), fmap))[:1]:
+                plt.imshow(image)
+                plt.show()
 
     if not os.path.exists(os.path.dirname(args.path_save_vae)):
         os.makedirs(os.path.dirname(args.path_save_vae))
@@ -118,8 +141,8 @@ def train_base(args):
                                 texts=texts)
             loss.backward()
             base_maskgit.zero_grad()
-            if i % 100 == 0 or args.use_min_data:
-                print('step: %d, loss: %.5f' % (i, loss.item()))
+            if i % 10 == 0 or args.use_min_data:
+                print('epoch: %d, step: %d, loss: %.5f' % (epoch, i, loss.item()))
 
     if not os.path.exists(os.path.dirname(args.path_save_base)):
         os.makedirs(os.path.dirname(args.path_save_base))
@@ -151,8 +174,8 @@ def train_superres(args):
                                     texts=texts)
             loss.backward()
             superres_maskgit.zero_grad()
-            if i % 100 == 0 or args.use_min_data:
-                print('step: %d, loss: %.5f' % (i, loss.item()))
+            if i % 10 == 0 or args.use_min_data:
+                print('epoch: %d, step: %d, loss: %.5f' % (epoch, i, loss.item()))
 
     if not os.path.exists(os.path.dirname(args.path_save_superres)):
         os.makedirs(os.path.dirname(args.path_save_superres))
@@ -163,12 +186,13 @@ def inference(args):
     vae = init_vae(args)
     transformer = init_transformer(is_base=True)
     base_maskgit = init_base(args, vae, transformer)
-    transformer = init_transformer(is_base=False)
-    superres_maskgit = init_superres(args, vae, transformer)
+    # transformer = init_transformer(is_base=False)
+    # superres_maskgit = init_superres(args, vae, transformer)
 
     muse = Muse(
         base = base_maskgit,
-        superres = superres_maskgit
+        # superres = superres_maskgit
+        superres = base_maskgit
     )
 
     if torch.cuda.is_available():
@@ -180,6 +204,12 @@ def inference(args):
         'this bird is brown with white and has a very short beak.',
         'this small bird is of variant shades of gray, and its beak is short and pointed.'
     ]
+
+    descriptions = [
+        'this bird is brown with a lighter brown crest.',
+        'this bird is brown with a lighter brown crest.',
+    ]
+    
     images = muse(descriptions)
 
     from matplotlib import pyplot as plt
@@ -189,6 +219,35 @@ def inference(args):
         plt.imshow(image)
         plt.show()
 
+def test_vae_result(args):
+    from matplotlib import pyplot as plt
+    import torchvision.transforms as T
+    vae = VQGanVAE(
+        dim = 256,
+        vq_codebook_size = 512
+    ).cuda()
+    vae.load(args.path_save_vae)
+
+    dataset = utils_data.get_dataset(args, 
+                                     image_size=args.image_size/2, 
+                                     is_train=True, 
+                                     is_only_image=True)
+
+    train_loader = torch.utils.data.DataLoader(dataset, 
+                                                batch_size=args.batch_size, 
+                                                shuffle=False,
+                                                drop_last=True,
+                                                num_workers=0)
+
+    for i, img in enumerate(train_loader):
+        if torch.cuda.is_available(): 
+            img = img.cuda()
+                
+        fmap, indices, commit_loss = vae.encode(img)
+        fmap = vae.decode(fmap)
+        for image in list(map(T.ToPILImage(), fmap))[:1]:
+            plt.imshow(image)
+            plt.show()
 
 if __name__ == '__main__':
     from muse_maskgit_pytorch import utils_data

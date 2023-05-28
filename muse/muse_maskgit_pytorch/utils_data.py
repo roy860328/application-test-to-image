@@ -35,7 +35,7 @@ class ImageDescDataset(Dataset):
         self.dataset = self.dataset["train"] if is_train else self.dataset["test"]
         self.dataset_image = self.dataset["image"]
         self.dataset_description = self.dataset["description"]
-        self.n = len(self.dataset) if not use_min_data else 100
+        self.n = len(self.dataset) if not use_min_data else 3
         self.transform = transforms.Compose([transforms.Resize((image_size, image_size)),
                                              transforms.ToTensor(),
                                              transforms.Lambda(lambda img: img.repeat(3, 1, 1) if img.shape[0] == 1 else img)])
@@ -65,13 +65,13 @@ class ImageDescDataset(Dataset):
 def get_args():
     parser = argparse.ArgumentParser(description='Dataset script')
     parser.add_argument('--dataset', type=str, default="CUB-200")
-    parser.add_argument('--image_size', type=int, default=128)
+    parser.add_argument('--image_size', type=int, default=256)
     parser.add_argument('--batch_size', type=int, default=2)
-    parser.add_argument('--num_epochs', type=int, default=1)
-    parser.add_argument('--num_train_steps_vae', type=int, default=10000)
-    parser.add_argument('--path_save_vae', type=str, default="./model/model_vae.pth")
-    parser.add_argument('--path_save_base', type=str, default="./model/model_base.pth")
-    parser.add_argument('--path_save_superres', type=str, default="./model/model_superres.pth")
+    parser.add_argument('--num_epochs', type=int, default=1000)
+    parser.add_argument('--num_train_steps_vae', type=int, default=200)
+    parser.add_argument('--path_save_vae', type=str, default="./model/model_vae.pt")
+    parser.add_argument('--path_save_base', type=str, default="./model/model_base.pt")
+    parser.add_argument('--path_save_superres', type=str, default="./model/model_superres.pt")
     parser.add_argument('--use_min_data', type=bool, default=True)
 
     args, unknown = parser.parse_known_args()

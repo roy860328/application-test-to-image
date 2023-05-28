@@ -16,6 +16,9 @@ import torchvision
 from einops import rearrange, reduce, repeat
 from einops.layers.torch import Rearrange
 
+from matplotlib import pyplot as plt
+import torchvision.transforms as T
+
 # constants
 
 MList = nn.ModuleList
@@ -512,8 +515,9 @@ class VQGanVAE(nn.Module):
         adaptive_weight.clamp_(max = 1e4)
 
         # combine losses
-
-        loss = recon_loss + perceptual_loss + commit_loss + adaptive_weight * gen_loss
+        # overfitting
+        # loss = recon_loss + perceptual_loss + commit_loss + adaptive_weight * gen_loss
+        loss = recon_loss
 
         if return_recons:
             return loss, fmap

@@ -165,7 +165,9 @@ class VQGanVAETrainer(nn.Module):
 
         # training params
 
-        self.register_buffer('steps', torch.Tensor([0]))
+        # overfitting
+        # self.register_buffer('steps', torch.Tensor([0]))
+        self.steps = 0
 
         self.num_train_steps = num_train_steps
         self.batch_size = batch_size
@@ -298,7 +300,10 @@ class VQGanVAETrainer(nn.Module):
     def train_step(self):
         device = self.device
 
-        steps = int(self.steps.item())
+        # overfitting
+        # steps = int(self.steps.item())
+        steps = self.steps
+
         apply_grad_penalty = not (steps % self.apply_grad_penalty_every)
 
         self.vae.train()
@@ -356,6 +361,7 @@ class VQGanVAETrainer(nn.Module):
             # log
 
             self.print(f"{steps}: vae loss: {logs['loss']} - discr loss: {logs['discr_loss']}")
+            self.print(f"{img[0][0][0][:10]}")
 
         # update exponential moving averaged generator
 

@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Text-to-Image Website</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="/static/js/script.js"></script>
+</head>
+<body>
+  <h1>Text-to-Image Website</h1>
+
+  <input type="text" id="textInput">
+  <button onclick="sendText()">Send</button>
+
+  <h2>Output Image</h2>
+  <img src="" id="outputImage">
+
+  <h2>Example Table</h2>
+  <table id="exampleTable">
+    <tr>
+      <th>Text</th>
+      <th>Image</th>
+    </tr>
+    <tr>
+      <td>this bird is brown with a lighter brown crest.</td>
+      <td><img src="/static/images/example_image_1.png"></td>
+    </tr>
+    <tr>
+      <td>this flying bird has long brown wings and a black bill with a white stripe around it.</td>
+      <td><img src="/static/images/example_image_2.png"></td>
+    </tr>
+    <!-- Add more rows as needed -->
+  </table>
+</body>
+</html>

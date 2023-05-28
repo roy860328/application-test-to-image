@@ -715,6 +715,7 @@ class MaskGit(nn.Module):
             return_logits = True
         )
 
+        print(ce_loss)
         if not exists(self.token_critic) or train_only_generator:
             return ce_loss
 
@@ -732,7 +733,7 @@ class MaskGit(nn.Module):
             labels = critic_labels,
             cond_drop_prob = cond_drop_prob
         )
-
+        print(ce_loss, self.critic_loss_weight * bce_loss)
         return ce_loss + self.critic_loss_weight * bce_loss
 
 # final Muse class
@@ -747,8 +748,8 @@ class Muse(nn.Module):
         super().__init__()
         self.base_maskgit = base.eval()
 
-        assert superres.resize_image_for_cond_image
-        self.superres_maskgit = superres.eval()
+        # assert superres.resize_image_for_cond_image
+        # self.superres_maskgit = superres.eval()
 
     @torch.no_grad()
     def forward(
@@ -767,14 +768,20 @@ class Muse(nn.Module):
             temperature = temperature,
             timesteps = timesteps
         )
-
-        superres_image = self.superres_maskgit.generate(
+        superres_image = self.base_maskgit.generate(
             texts = texts,
             cond_scale = cond_scale,
-            cond_images = lowres_image,
             temperature = temperature,
-            timesteps = default(superres_timesteps, timesteps)
+            timesteps = timesteps
         )
+
+        # superres_image = self.superres_maskgit.generate(
+        #     texts = texts,
+        #     cond_scale = cond_scale,
+        #     cond_images = lowres_image,
+        #     temperature = temperature,
+        #     timesteps = default(superres_timesteps, timesteps)
+        # )
         
         if return_pil_images:
             lowres_image = list(map(T.ToPILImage(), lowres_image))

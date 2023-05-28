@@ -23,5 +23,3 @@ This project aims to generate an image based on an input text using an open-sour
 ![Web Page](img/web.gif)
 ![Web Running Init](img/web_running_init.gif)
 ![Web Inference](img/web_inference.gif)
-
-

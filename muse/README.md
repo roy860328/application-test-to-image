@@ -23,10 +23,11 @@ To run the code, please ensure you have the following requirements installed:
 ```
 ### Dataset
 
-The training dataset used for this version of Muse is the Caltech-UCSD Birds-200-2011 (CUB-200) dataset. It contains 11,788 images with 200 categories. The dataset provides annotations such as part locations, binary attributes, and bounding boxes for each image.
+The training dataset used for this version of Muse is the [Caltech-UCSD Birds-200-2011 (CUB-200) dataset](https://www.vision.caltech.edu/datasets/cub_200_2011/). It contains 11,788 images with 200 categories. The dataset provides annotations such as part locations, binary attributes, and bounding boxes for each image.
 
 In this repo, I copy dataset directly from the below by datasets: 
 https://huggingface.co/datasets/alkzar90/CC6204-Hackaton-Cub-Dataset
+
 
 
 ### Training
@@ -45,7 +46,7 @@ train.inference(args)
 
 ### Sample Input/Output
 VQGanVAE
-<img src="./result_VQGanVAE.png" width="450px"></img>
+<img src="./result/result_VQGanVAE.png" width="450px"></img>
 
 MaskGit Input:
 `./dataset_text_test/*`

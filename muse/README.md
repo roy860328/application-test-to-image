@@ -1,304 +1,97 @@
-
-## Muse
-https://pytorch.org/get-started/locally/
-```bash
-$ pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-$ pip3 install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
-$ pip install muse-maskgit-pytorch
+## Muse - Pytorch
+Origin Repository
 ```
-
-
+https://github.com/lucidrains/muse-maskgit-pytorch
+```
 <img src="./muse.png" width="450px"></img>
 
-## Muse - Pytorch
+## Implement
+This is my version of Muse, an implementation of the paper "Muse: Text-to-Image Generation via Masked Generative Transformers" in PyTorch.
 
-Implementation of <a href="https://muse-model.github.io/">Muse</a>: Text-to-Image Generation via Masked Generative Transformers, in Pytorch
+Please reference the pipeline at `muse/example.ipynb` for detailed implementation.
 
-Please join <a href="https://discord.gg/xBPBXfcFHd"><img alt="Join us on Discord" src="https://img.shields.io/discord/823813159592001537?color=5865F2&logo=discord&logoColor=white"></a> if you are interested in helping out with the replication with the <a href="https://laion.ai/">LAION</a> community
 
-## Install
+### Installation
+To run the code, please ensure you have the following requirements installed:
+```
+!pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+!git clone https://github.com/roy860328/application-test-to-image.git
+!cd application-test-to-image/muse; pip3 install -r requirements.txt
+!cd application-test-to-image/muse; git clone https://github.com/Taited/clip-score.git
+!pip3 install ftfy regex tqdm
+!pip3 install git+https://github.com/openai/CLIP.git
+```
+### Dataset
 
-```bash
-$ pip install muse-maskgit-pytorch
+The training dataset used for this version of Muse is the Caltech-UCSD Birds-200-2011 (CUB-200) dataset. It contains 11,788 images with 200 categories. The dataset provides annotations such as part locations, binary attributes, and bounding boxes for each image.
+
+In this repo, I copy dataset directly from the below by datasets: 
+https://huggingface.co/datasets/alkzar90/CC6204-Hackaton-Cub-Dataset
+
+
+### Training
+
+Follow the steps below to run the training:
+
+```
+from muse_maskgit_pytorch import utils_data
+from example import train
+
+args = utils_data.get_args()
+train.train_vae(args)
+train.train_base(args)
+train.inference(args)
 ```
 
-## Usage
+### Sample Input/Output
+VQGanVAE
+<img src="./result_VQGanVAE.png" width="450px"></img>
 
-First train your VAE - `VQGanVAE`
+MaskGit Input:
+`./dataset_text_test/*`
 
-```python
-import torch
-from muse_maskgit_pytorch import VQGanVAE, VQGanVAETrainer
 
-vae = VQGanVAE(
-    dim = 256,
-    vq_codebook_size = 512
-)
+MaskGit Output:
+`./dataset_image_test/*`
 
-# train on folder of images, as many images as possible
+### Model Parameters
+1. vae model: parameter size: 375,517,188
+2. MaskGit model: parameter size: 36,347,389
 
-trainer = VQGanVAETrainer(
-    vae = vae,
-    image_size = 128,             # you may want to start with small images, and then curriculum learn to larger ones, but because the vae is all convolution, it should generalize to 512 (as in paper) without training on it
-    folder = '/path/to/images',
-    batch_size = 4,
-    grad_accum_every = 8,
-    num_train_steps = 50000
-).cuda()
+### Model Evaluation
 
-trainer.train()
+For model evaluation, I have used the CLIP score. CLIP Score refers to the cosine similarity between the feature vectors of text and images when they are inputted into OpenAI's CLIP (Contrastive Language-Image Pre-training) model. A higher CLIP Score indicates a higher correlation between the image-text pairs. CLIP Score is used to evaluate the matching and relevance between natural language and images. It provides a measure of how well the text and image are aligned and correlated.
+
+
+The following command is for the original dataset of image-text pairs:
+
+```
+import evaluation_data
+evaluation_data.save_origin_dataset()
 ```
 
-Then pass the trained `VQGanVAE` and a `Transformer` to `MaskGit`
+Run the CLIP score evaluation on the original dataset:
 
-```python
-import torch
-from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
-
-# first instantiate your vae
-
-vae = VQGanVAE(
-    dim = 256,
-    vq_codebook_size = 512
-).cuda()
-
-vae.load('/path/to/vae.pt') # you will want to load the exponentially moving averaged VAE
-
-# then you plug the vae and transformer into your MaskGit as so
-
-# (1) create your transformer / attention network
-
-transformer = MaskGitTransformer(
-    num_tokens = 512,         # must be same as codebook size above
-    seq_len = 256,            # must be equivalent to fmap_size ** 2 in vae
-    dim = 512,                # model dimension
-    depth = 8,                # depth
-    dim_head = 64,            # attention head dimension
-    heads = 8,                # attention heads,
-    ff_mult = 4,              # feedforward expansion factor
-    t5_name = 't5-small',     # name of your T5
-)
-
-# (2) pass your trained VAE and the base transformer to MaskGit
-
-base_maskgit = MaskGit(
-    vae = vae,                 # vqgan vae
-    transformer = transformer, # transformer
-    image_size = 256,          # image size
-    cond_drop_prob = 0.25,     # conditional dropout, for classifier free guidance
-).cuda()
-
-# ready your training text and images
-
-texts = [
-    'a child screaming at finding a worm within a half-eaten apple',
-    'lizard running across the desert on two feet',
-    'waking up to a psychedelic landscape',
-    'seashells sparkling in the shallow waters'
-]
-
-images = torch.randn(4, 3, 256, 256).cuda()
-
-# feed it into your maskgit instance, with return_loss set to True
-
-loss = base_maskgit(
-    images,
-    texts = texts
-)
-
-loss.backward()
-
-# do this for a long time on much data
-# then...
-
-images = base_maskgit.generate(texts = [
-    'a whale breaching from afar',
-    'young girl blowing out candles on her birthday cake',
-    'fireworks with blue and green sparkles'
-], cond_scale = 3.) # conditioning scale for classifier free guidance
-
-images.shape # (3, 3, 256, 256)
+```
+python3 src/clip_score/clip_score.py ./dataset_image_origin ./dataset_text_origin
 ```
 
+The following command loads a pre-trained model to generate an image from text:
 
-To train the super-resolution maskgit requires you to change 1 field on `MaskGit` instantiation (you will need to now pass in the `cond_image_size`, as the previous image size being conditioned on)
-
-Optionally, you can pass in a different `VAE` as `cond_vae` for the conditioning low-resolution image. By default it will use the `vae` for both tokenizing the super and low resoluted images.
-
-```python
-import torch
-import torch.nn.functional as F
-from muse_maskgit_pytorch import VQGanVAE, MaskGit, MaskGitTransformer
-
-# first instantiate your ViT VQGan VAE
-# a VQGan VAE made of transformers
-
-vae = VQGanVAE(
-    dim = 256,
-    vq_codebook_size = 512
-).cuda()
-
-vae.load('./path/to/vae.pt') # you will want to load the exponentially moving averaged VAE
-
-# then you plug the VqGan VAE into your MaskGit as so
-
-# (1) create your transformer / attention network
-
-transformer = MaskGitTransformer(
-    num_tokens = 512,         # must be same as codebook size above
-    seq_len = 1024,           # must be equivalent to fmap_size ** 2 in vae
-    dim = 512,                # model dimension
-    depth = 2,                # depth
-    dim_head = 64,            # attention head dimension
-    heads = 8,                # attention heads,
-    ff_mult = 4,              # feedforward expansion factor
-    t5_name = 't5-small',     # name of your T5
-)
-
-# (2) pass your trained VAE and the base transformer to MaskGit
-
-superres_maskgit = MaskGit(
-    vae = vae,
-    transformer = transformer,
-    cond_drop_prob = 0.25,
-    image_size = 512,                     # larger image size
-    cond_image_size = 256,                # conditioning image size <- this must be set
-).cuda()
-
-# ready your training text and images
-
-texts = [
-    'a child screaming at finding a worm within a half-eaten apple',
-    'lizard running across the desert on two feet',
-    'waking up to a psychedelic landscape',
-    'seashells sparkling in the shallow waters'
-]
-
-images = torch.randn(4, 3, 512, 512).cuda()
-
-# feed it into your maskgit instance, with return_loss set to True
-
-loss = superres_maskgit(
-    images,
-    texts = texts
-)
-
-loss.backward()
-
-# do this for a long time on much data
-# then...
-
-images = superres_maskgit.generate(
-    texts = [
-        'a whale breaching from afar',
-        'young girl blowing out candles on her birthday cake',
-        'fireworks with blue and green sparkles',
-        'waking up to a psychedelic landscape'
-    ],
-    cond_images = F.interpolate(images, 256),  # conditioning images must be passed in for generating from superres
-    cond_scale = 3.
-)
-
-images.shape # (4, 3, 512, 512)
+```
+import evaluation_data
+import utils_model
+gt_texts = ['this bird is brown with a lighter brown crest.']
+images = utils_model.inference(gt_texts)
+evaluation_data.save_image_text(images,
+                                gt_texts,
+                                path_name_image="dataset_image_test",
+                                path_name_text="dataset_text_test")
 ```
 
-All together now
+Run the CLIP score evaluation on the result:
 
-```python
-from muse_maskgit_pytorch import Muse
-
-base_maskgit.load('./path/to/base.pt')
-
-superres_maskgit.load('./path/to/superres.pt')
-
-# pass in the trained base_maskgit and superres_maskgit from above
-
-muse = Muse(
-    base = base_maskgit,
-    superres = superres_maskgit
-)
-
-images = muse([
-    'a whale breaching from afar',
-    'young girl blowing out candles on her birthday cake',
-    'fireworks with blue and green sparkles',
-    'waking up to a psychedelic landscape'
-])
-
-images # List[PIL.Image.Image]
+```
+python3 src/clip_score/clip_score.py ./dataset_image_test ./dataset_text_test
 ```
 
-## Appreciation
-
-- <a href="https://stability.ai/">StabilityAI</a> for the sponsorship, as well as my other sponsors, for affording me the independence to open source artificial intelligence.
-
-- <a href="https://huggingface.co/">🤗 Huggingface</a> for the transformers and accelerate library, both which are wonderful
-
-## Todo
-
-- [x] test end-to-end
-- [x] separate cond_images_or_ids, it is not done right
-- [x] add training code for vae
-- [x] add optional self-conditioning on embeddings
-- [x] combine with token critic paper, already implemented at <a href="https://github.com/lucidrains/phenaki-pytorch">Phenaki</a>
-
-- [ ] hook up accelerate training code for maskgit
-
-## Citations
-
-```bibtex
-@inproceedings{Chang2023MuseTG,
-    title   = {Muse: Text-To-Image Generation via Masked Generative Transformers},
-    author  = {Huiwen Chang and Han Zhang and Jarred Barber and AJ Maschinot and Jos{\'e} Lezama and Lu Jiang and Ming-Hsuan Yang and Kevin P. Murphy and William T. Freeman and Michael Rubinstein and Yuanzhen Li and Dilip Krishnan},
-    year    = {2023}
-}
-```
-
-```bibtex
-@article{Chen2022AnalogBG,
-    title   = {Analog Bits: Generating Discrete Data using Diffusion Models with Self-Conditioning},
-    author  = {Ting Chen and Ruixiang Zhang and Geo rey E. Hinton},
-    journal = {ArXiv},
-    year    = {2022},
-    volume  = {abs/2208.04202}
-}
-```
-
-```bibtex
-@misc{jabri2022scalable,
-    title   = {Scalable Adaptive Computation for Iterative Generation},
-    author  = {Allan Jabri and David Fleet and Ting Chen},
-    year    = {2022},
-    eprint  = {2212.11972},
-    archivePrefix = {arXiv},
-    primaryClass = {cs.LG}
-}
-```
-
-```bibtex
-@article{Lezama2022ImprovedMI,
-    title   = {Improved Masked Image Generation with Token-Critic},
-    author  = {Jos{\'e} Lezama and Huiwen Chang and Lu Jiang and Irfan Essa},
-    journal = {ArXiv},
-    year    = {2022},
-    volume  = {abs/2209.04439}
-}
-```
-
-```bibtex
-@inproceedings{Nijkamp2021SCRIPTSP,
-    title   = {SCRIPT: Self-Critic PreTraining of Transformers},
-    author  = {Erik Nijkamp and Bo Pang and Ying Nian Wu and Caiming Xiong},
-    booktitle = {North American Chapter of the Association for Computational Linguistics},
-    year    = {2021}
-}
-```
-
-```bibtex
-@misc{gilmer2023intriguing
-    title  = {Intriguing Properties of Transformer Training Instabilities},
-    author = {Justin Gilmer, Andrea Schioppa, and Jeremy Cohen},
-    year   = {2023},
-    status = {to be published - one attention stabilization technique is circulating within Google Brain, being used by multiple teams}
-}
-```

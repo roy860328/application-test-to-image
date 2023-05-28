@@ -25,6 +25,8 @@ def init_vae(args):
         vq_codebook_size = vq_codebook_size,
         layer = layer
     )
+    # show model parameter size
+    print(f"init_vae model parameter size: {sum(p.numel() for p in vae.parameters())}")
     if torch.cuda.is_available(): 
         vae = vae.cuda()
     if os.path.exists(args.path_save_vae):
@@ -43,6 +45,8 @@ def init_transformer(is_base=False):
         ff_mult = 4,              # feedforward expansion factor
         t5_name = 't5-small',     # name of your T5
     )
+    # show model parameter size
+    print(f"init_transformer model parameter size: {sum(p.numel() for p in transformer.parameters())}")
     return transformer
 
 def init_base(args, vae, transformer):

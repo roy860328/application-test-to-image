@@ -1,14 +1,14 @@
 import os, sys
 from PIL import Image
 
-# debug mode don't need to load model
 is_debug = False
 if not is_debug:
     # append muse to path
     sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
     from muse import utils_model
 else:
-    pass
+    print("debug mode, without load model")
+    print("when input text, will return a fake image directly")
 
 # fake model for testing
 def inference(text):

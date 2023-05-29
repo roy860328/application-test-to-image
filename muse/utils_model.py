@@ -10,10 +10,12 @@ def get_model(args):
     vae = init_vae(args)
     transformer = init_transformer(is_base=True)
     base_maskgit = init_base(args, vae, transformer)
+    transformer = init_transformer(is_base=False)
+    superres_maskgit = init_superres(args, vae, transformer)
 
     muse = Muse(
         base = base_maskgit,
-        superres = base_maskgit
+        superres = superres_maskgit
     )
 
     if torch.cuda.is_available():

@@ -748,8 +748,8 @@ class Muse(nn.Module):
         super().__init__()
         self.base_maskgit = base.eval()
 
-        # assert superres.resize_image_for_cond_image
-        # self.superres_maskgit = superres.eval()
+        assert superres.resize_image_for_cond_image
+        self.superres_maskgit = superres.eval()
 
     @torch.no_grad()
     def forward(
@@ -768,20 +768,14 @@ class Muse(nn.Module):
             temperature = temperature,
             timesteps = timesteps
         )
-        superres_image = self.base_maskgit.generate(
+
+        superres_image = self.superres_maskgit.generate(
             texts = texts,
             cond_scale = cond_scale,
+            cond_images = lowres_image,
             temperature = temperature,
-            timesteps = timesteps
+            timesteps = default(superres_timesteps, timesteps)
         )
-
-        # superres_image = self.superres_maskgit.generate(
-        #     texts = texts,
-        #     cond_scale = cond_scale,
-        #     cond_images = lowres_image,
-        #     temperature = temperature,
-        #     timesteps = default(superres_timesteps, timesteps)
-        # )
         
         if return_pil_images:
             lowres_image = list(map(T.ToPILImage(), lowres_image))
